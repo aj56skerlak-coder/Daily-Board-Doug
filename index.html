@@ -1011,100 +1011,6 @@ main{padding:16px 24px;max-width:100%;margin:0 auto}
     </div>
     <div class="team-grid" id="team-grid"></div>
   </div>
-      <div class="person-header">
-        <div class="person-avatar" style="background:#0E7C7B">DM</div>
-        <div class="person-info">
-          <div class="person-name">Doug</div>
-          <div class="person-role">Survey Manager</div>
-        </div>
-        <div class="person-stats" style="flex-direction:column;align-items:flex-end">
-          
-          
-          <span class="person-stat" style="background:var(--surface2);color:var(--muted)">0 active</span>
-        </div>
-      </div>
-      <div class="person-body">
-        <div class="person-active-tasks"><div class="empty-hint">No active tasks assigned</div></div>
-        <div class="add-assign-row">
-          <input class="add-assign-input" id="aa-input-doug" placeholder="Assign a task to Doug..." onkeydown="if(event.key===&#39;Enter&#39;)addAssignTask(&#39;doug&#39;)">
-          <div class="add-assign-bottom">
-            <input type="date" class="add-assign-date" id="aa-date-doug" title="Due date">
-            <input class="add-assign-notes" id="aa-notes-doug" placeholder="Notes (optional)">
-            <button class="add-assign-btn" onclick="addAssignTask(&#39;doug&#39;)">Assign</button>
-          </div>
-        </div>
-        <div class="completed-log">
-          <div class="completed-log-header" onclick="toggleCompletedLog(&#39;doug&#39;)">
-            <span class="completed-log-title">Completed log (0)</span>
-            <span class="completed-log-toggle">▸ show</span>
-          </div>
-          <div class="completed-log-body"><div class="empty-hint">No completed tasks yet</div></div>
-        </div>
-      </div>
-    </div><div class="person-board">
-      <div class="person-header">
-        <div class="person-avatar" style="background:#B5690A">MR</div>
-        <div class="person-info">
-          <div class="person-name">Mike</div>
-          <div class="person-role">Main 3D Modeler — ACC/Forma</div>
-        </div>
-        <div class="person-stats" style="flex-direction:column;align-items:flex-end">
-          
-          
-          <span class="person-stat" style="background:var(--surface2);color:var(--muted)">0 active</span>
-        </div>
-      </div>
-      <div class="person-body">
-        <div class="person-active-tasks"><div class="empty-hint">No active tasks assigned</div></div>
-        <div class="add-assign-row">
-          <input class="add-assign-input" id="aa-input-mike" placeholder="Assign a task to Mike..." onkeydown="if(event.key===&#39;Enter&#39;)addAssignTask(&#39;mike&#39;)">
-          <div class="add-assign-bottom">
-            <input type="date" class="add-assign-date" id="aa-date-mike" title="Due date">
-            <input class="add-assign-notes" id="aa-notes-mike" placeholder="Notes (optional)">
-            <button class="add-assign-btn" onclick="addAssignTask(&#39;mike&#39;)">Assign</button>
-          </div>
-        </div>
-        <div class="completed-log">
-          <div class="completed-log-header" onclick="toggleCompletedLog(&#39;mike&#39;)">
-            <span class="completed-log-title">Completed log (0)</span>
-            <span class="completed-log-toggle">▸ show</span>
-          </div>
-          <div class="completed-log-body"><div class="empty-hint">No completed tasks yet</div></div>
-        </div>
-      </div>
-    </div><div class="person-board">
-      <div class="person-header">
-        <div class="person-avatar" style="background:#555">A</div>
-        <div class="person-info">
-          <div class="person-name">Assigned Out</div>
-          <div class="person-role">Cross-company &amp; Leadership Council</div>
-        </div>
-        <div class="person-stats" style="flex-direction:column;align-items:flex-end">
-          
-          
-          <span class="person-stat" style="background:var(--surface2);color:var(--muted)">0 active</span>
-        </div>
-      </div>
-      <div class="person-body">
-        <div class="person-active-tasks"><div class="empty-hint">No active tasks assigned</div></div>
-        <div class="add-assign-row">
-          <input class="add-assign-input" id="aa-input-assigned" placeholder="Assign a task to Assigned Out..." onkeydown="if(event.key===&#39;Enter&#39;)addAssignTask(&#39;assigned&#39;)">
-          <div class="add-assign-bottom">
-            <input type="date" class="add-assign-date" id="aa-date-assigned" title="Due date">
-            <input class="add-assign-notes" id="aa-notes-assigned" placeholder="Notes (optional)">
-            <button class="add-assign-btn" onclick="addAssignTask(&#39;assigned&#39;)">Assign</button>
-          </div>
-        </div>
-        <div class="completed-log">
-          <div class="completed-log-header" onclick="toggleCompletedLog(&#39;assigned&#39;)">
-            <span class="completed-log-title">Completed log (0)</span>
-            <span class="completed-log-toggle">▸ show</span>
-          </div>
-          <div class="completed-log-body"><div class="empty-hint">No completed tasks yet</div></div>
-        </div>
-      </div>
-    </div></div>
-  </div>
 
   <!-- DUMP -->
   <div class="view" id="view-dump">
@@ -2687,7 +2593,7 @@ function renderReminders(){
 }
 
 function save(){
-  try{localStorage.setItem('triage_v12',JSON.stringify({state,areaOpen,currentView,completedLogOpen}));}catch(e){}
+  try{localStorage.setItem(_KEY,JSON.stringify({state,areaOpen,currentView,completedLogOpen}));}catch(e){}
   // Sync to Supabase with debounce
   if(typeof sbSave === 'function'){
     clearTimeout(save._t);
@@ -2696,7 +2602,7 @@ function save(){
 }
 function load(){
   try{
-    const d=localStorage.getItem('triage_v12');
+    const d=localStorage.getItem(_KEY);
     if(d){
       const p=JSON.parse(d);
       state=p.state;
