@@ -851,6 +851,7 @@ main{padding:16px 24px;max-width:100%;margin:0 auto}
     </div></div>
       <div class="limit-msg" id="today-limit-b">3 max — finish or move one first</div>
     </div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button onclick="openAreaManager()" style="font-size:11px;padding:5px 12px;border-radius:var(--rsm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--muted);cursor:pointer;font-family:inherit">⚙ Manage areas</button></div>
     <div class="areas" id="areas"><div class="area-section">
       <div class="area-header" onclick="toggleArea(&#39;survey&#39;)">
         <div class="area-color-bar" style="background:var(--survey)"></div>
@@ -1026,13 +1027,7 @@ main{padding:16px 24px;max-width:100%;margin:0 auto}
         <!-- Capture mode -->
         <div id="dump-capture-row" class="dump-input-row">
           <input class="dump-input" id="dump-input" placeholder="What&#39;s in your head..." onkeydown="if(event.key===&#39;Enter&#39;)addDump()">
-          <select class="dump-area-sel" id="dump-area-sel">
-            <option value="survey">Survey</option>
-            <option value="acc">ACC &amp; Technology</option>
-            <option value="auto">Automation &amp; AI</option>
-            <option value="fire">Fire Dept</option>
-            <option value="family">Family &amp; Personal</option>
-          </select>
+          <select class="dump-area-sel" id="dump-area-sel"></select>
           <button class="dump-add" onclick="addDump()">Add</button>
         </div>
         <!-- List mode -->
@@ -1040,13 +1035,7 @@ main{padding:16px 24px;max-width:100%;margin:0 auto}
           <textarea class="dump-list-input" id="dump-list-input" placeholder="One item per line...&#10;&#10;Clean up email&#10;Follow up with Doug&#10;Check expense report"></textarea>
           <div class="dump-list-hint">Each line becomes a separate item. Tag area for all:</div>
           <div class="dump-input-row" style="margin-top:6px">
-            <select class="dump-area-sel" id="dump-list-area-sel">
-              <option value="survey">Survey</option>
-              <option value="acc">ACC &amp; Technology</option>
-              <option value="auto">Automation &amp; AI</option>
-              <option value="fire">Fire Dept</option>
-              <option value="family">Family &amp; Personal</option>
-            </select>
+            <select class="dump-area-sel" id="dump-list-area-sel"></select>
             <button class="dump-add" onclick="addDumpList()">Add all</button>
           </div>
         </div>
@@ -1173,13 +1162,7 @@ main{padding:16px 24px;max-width:100%;margin:0 auto}
         </div>
         <div class="task-modal-field">
           <label class="task-modal-label">Area</label>
-          <select class="task-modal-select" id="tm-area">
-            <option value="survey">Survey</option>
-            <option value="acc">ACC &amp; Technology</option>
-            <option value="auto">Automation &amp; AI</option>
-            <option value="fire">Fire Department</option>
-            <option value="family">Family &amp; Personal</option>
-          </select>
+          <select class="task-modal-select" id="tm-area"></select>
         </div>
       </div>
       <div class="task-modal-row">
@@ -1349,6 +1332,14 @@ const AREA_CFG={
   family: {label:'Family & Personal',color:'var(--family)', bg:'var(--family-bg)'}
 };
 const AREAS=['survey','acc','auto','fire','family'];
+function getAllAreas(){const c=state.customAreas?Object.keys(state.customAreas):[];return[...AREAS,...c];}
+function getAreaCfg(area){
+  if(AREA_CFG[area])return AREA_CFG[area];
+  const ca=state.customAreas&&state.customAreas[area];
+  if(ca)return{label:ca.label,color:ca.color,bg:ca.color+'26'};
+  return{label:area||'Unknown',color:'#888888',bg:'#88888826'};
+}
+function getAreaColor(area){if(AREA_COLORS[area])return AREA_COLORS[area];const ca=state.customAreas&&state.customAreas[area];return ca?ca.color:'#888888';}
 const TCOLS=['week','waiting','done'];
 const TCOL_CFG={
   week:   {label:'This week',    dot:'var(--amber)'},
@@ -1687,12 +1678,12 @@ function firePulse(){
 
   // Build task options for selector
   const allTasks=[];
-  AREAS.forEach(area=>TCOLS.filter(c=>c!=='done').forEach(col=>{
+  getAllAreas().forEach(area=>TCOLS.filter(c=>c!=='done').forEach(col=>{
     state.areas[area][col].forEach(t=>{if(!t.isSubtask)allTasks.push({id:t.id,text:t.text,area});});
   }));
   state.today.filter(t=>!t.isSubtask).forEach(t=>{if(!allTasks.find(x=>x.id===t.id))allTasks.push({id:t.id,text:t.text,area:t.area});});
 
-  const opts=allTasks.slice(0,20).map(t=>`<option value="${t.id}"${activeTask&&t.id===activeTask.id?' selected':''}>${AREA_CFG[t.area]?.label||''} — ${t.text.slice(0,50)}</option>`).join('');
+  const opts=allTasks.slice(0,20).map(t=>`<option value="${t.id}"${activeTask&&t.id===activeTask.id?' selected':''}>${getAreaCfg(t.area)?.label||''} — ${t.text.slice(0,50)}</option>`).join('');
 
   taskSection.innerHTML=`
     <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Logging time to</div>
@@ -1746,7 +1737,7 @@ function confirmPulse(){
   let logTask=activeTask;
   if(overrideId){
     let found=state.today.find(t=>t.id===overrideId);
-    if(!found) AREAS.forEach(a=>TCOLS.forEach(c=>{if(!found)found=state.areas[a]?.[c]?.find(t=>t.id===overrideId);}));
+    if(!found) getAllAreas().forEach(a=>TCOLS.forEach(c=>{if(!found)found=state.areas[a]?.[c]?.find(t=>t.id===overrideId);}));
     if(found) logTask=found;
   }
   const entry={
@@ -1933,7 +1924,7 @@ function renderTimeBlocks(){
 
   // Build all tasks + subtasks for picker
   const allTasks=[];
-  AREAS.forEach(area=>{
+  getAllAreas().forEach(area=>{
     TCOLS.filter(c=>c!=='done').forEach(col=>{
       state.areas[area][col].forEach(t=>{
         if(!t.isSubtask){
@@ -1959,7 +1950,7 @@ function renderTimeBlocks(){
     if(slot&&slot.type==='task'){
       if(slot.continuation) return '';
       const task=allTasks.find(t=>t.id===slot.taskId);
-      const areaCfg=task?AREA_CFG[task.area]:null;
+      const areaCfg=task?getAreaCfg(task.area):null;
       const spanCount=slot.durationSlots||1;
       slotHtml=`<div class="time-block-slot filled-task${isActive?' active-block':''}" style="min-height:${28*spanCount+(spanCount-1)*2}px" onclick="openSlotPicker('${key}')">
         ${areaCfg?`<div class="time-block-area-dot" style="background:${areaCfg.color}"></div>`:''}
@@ -1986,7 +1977,7 @@ function renderTimeBlocks(){
       const searchVal=slotSearchVal.toLowerCase();
       const filtered=allTasks.filter(t=>!searchVal||t.displayText.toLowerCase().includes(searchVal)).slice(0,10);
       const taskItems=filtered.map(t=>{
-        const cfg=AREA_CFG[t.area];
+        const cfg=getAreaCfg(t.area);
         const subId=t.isSubtaskEntry?`'${t.id}'`:'null';
         const parentId=t.isSubtaskEntry?`'${t.parentId}'`:'null';
         return `<div class="slot-picker-item" onclick="assignTaskToSlot('${key}','${t.id}',${subId},${parentId})">
@@ -2094,7 +2085,7 @@ function updateSlotSearchResults(key){
   const resultsEl=document.getElementById('slot-results-'+key);
   if(!resultsEl) return;
   const allTasks=[];
-  AREAS.forEach(area=>{
+  getAllAreas().forEach(area=>{
     TCOLS.filter(c=>c!=='done').forEach(col=>{
       state.areas[area][col].forEach(t=>{
         if(!t.isSubtask){
@@ -2121,7 +2112,7 @@ function updateSlotSearchResults(key){
 
   const itemsHtml=filtered.length
     ?filtered.map(t=>{
-        const cfg=AREA_CFG[t.area];
+        const cfg=getAreaCfg(t.area);
         const subId=t.isSubtaskEntry?`'${t.id}'`:'null';
         const parentId=t.isSubtaskEntry?`'${t.parentId}'`:'null';
         return `<div class="slot-picker-item" onclick="assignTaskToSlot('${key}','${t.id}',${subId},${parentId})">
@@ -2163,12 +2154,12 @@ function selectSlotEventType(key,type){
 function assignTaskToSlot(key,taskId,subId,parentId){
   const task=(()=>{
     let found=state.today.find(t=>t.id===taskId);
-    if(!found) AREAS.forEach(a=>TCOLS.forEach(c=>{if(!found)found=state.areas[a][c]?.find(t=>t.id===taskId);}));
+    if(!found) getAllAreas().forEach(a=>TCOLS.forEach(c=>{if(!found)found=state.areas[a][c]?.find(t=>t.id===taskId);}));
     // If it's a subtask, look inside parent
     if(!found&&parentId){
-      AREAS.forEach(a=>TCOLS.forEach(c=>{
+      getAllAreas().forEach(a=>TCOLS.forEach(c=>{
         if(!found){
-          const parent=state.areas[a][c]?.find(t=>t.id===parentId);
+          const parent=state.areas[a]?.[c]?.find(t=>t.id===parentId);
           if(parent) found=parent.subtasks?.find(s=>s.id===taskId);
           if(found){found={...found,area:a,col:c,parentId,isSubtaskEntry:true};}
         }
@@ -2259,7 +2250,7 @@ function getActiveBlockTask(){
   // Subtask slot — find the subtask within its parent
   if(slot.isSubtask&&slot.subId&&slot.parentId){
     let parent=null;
-    AREAS.forEach(a=>TCOLS.forEach(c=>{
+    getAllAreas().forEach(a=>TCOLS.forEach(c=>{
       if(!parent){const t=state.areas[a]?.[c]?.find(t=>t.id===slot.parentId);if(t){parent=t;parent._area=a;parent._col=c;}}
     }));
     if(!parent) parent=state.today.find(t=>t.id===slot.parentId);
@@ -2269,7 +2260,7 @@ function getActiveBlockTask(){
   }
   // Regular task
   let found=state.today.find(t=>t.id===slot.taskId);
-  if(!found) AREAS.forEach(a=>TCOLS.forEach(c=>{if(!found){const t=state.areas[a]?.[c]?.find(t=>t.id===slot.taskId);if(t){found=t;found._area=a;found._col=c;}}}));
+  if(!found) getAllAreas().forEach(a=>TCOLS.forEach(c=>{if(!found){const t=state.areas[a]?.[c]?.find(t=>t.id===slot.taskId);if(t){found=t;found._area=a;found._col=c;}}}));
   return found||null;
 }
 // Re-entry note shown at top of task modal when opening
@@ -2609,7 +2600,7 @@ function load(){
       areaOpen=p.areaOpen||{survey:true,acc:true,auto:true,fire:true,family:true};
       currentView='urgent';
       completedLogOpen=p.completedLogOpen||{doug:false,mike:false,assigned:false};
-      AREAS.forEach(a=>{if(!state.areas[a])state.areas[a]={week:[],waiting:[],done:[]};TCOLS.forEach(c=>{if(!state.areas[a][c])state.areas[a][c]=[];});});
+      getAllAreas().forEach(a=>{if(!state.areas[a])state.areas[a]={week:[],waiting:[],done:[]};TCOLS.forEach(c=>{if(!state.areas[a][c])state.areas[a][c]=[];});});
       if(!state.team)state.team={doug:{active:[],completed:[]},mike:{active:[],completed:[]},assigned:{active:[],completed:[]}};
       PEOPLE.forEach(p=>{if(!state.team[p])state.team[p]={active:[],completed:[]};});
       return true;
@@ -2667,7 +2658,7 @@ function clearSortOrder(task){
 
 function clearReentryNote(taskId){
   const allTasks=[...state.today];
-  AREAS.forEach(a=>TCOLS.forEach(c=>state.areas[a][c].forEach(t=>allTasks.push(t))));
+  getAllAreas().forEach(a=>TCOLS.forEach(c=>state.areas[a]?.[c]?.forEach(t=>allTasks.push(t))));
   const task=allTasks.find(t=>t.id===taskId);
   if(task){delete task.reentryNote;delete task.reentryAt;save();render();}
   const banner=document.getElementById('tm-reentry-banner');
@@ -3044,6 +3035,77 @@ function addAssignTask(person){
   inp.value='';if(dat)dat.value='';if(notes)notes.value='';
   save();render();
 }
+/* ── AREA MANAGER ── */
+function populateAreaSelects(){
+  const areas=getAllAreas();
+  const opts=areas.map(a=>`<option value="${a}">${getAreaCfg(a).label}</option>`).join('');
+  ['dump-area-sel','dump-list-area-sel'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){const v=el.value;el.innerHTML=opts;if(areas.includes(v))el.value=v;}
+  });
+  const tmArea=document.getElementById('tm-area');
+  if(tmArea){const v=tmArea.value;tmArea.innerHTML=opts;if(areas.includes(v))tmArea.value=v;}
+}
+function openAreaManager(){
+  renderAreaManagerList();
+  const o=document.getElementById('area-mgr-overlay');
+  if(o){o.style.opacity='1';o.style.pointerEvents='auto';}
+  document.getElementById('new-area-name')?.focus();
+}
+function closeAreaManager(){
+  const o=document.getElementById('area-mgr-overlay');
+  if(o){o.style.opacity='0';o.style.pointerEvents='none';}
+}
+function renderAreaManagerList(){
+  const list=document.getElementById('area-mgr-list');
+  if(!list)return;
+  const builtIn=AREAS.map(a=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border)">
+      <div style="width:12px;height:12px;border-radius:50%;flex-shrink:0;background:${AREA_COLORS[a]}"></div>
+      <span style="flex:1;font-size:13px;color:var(--text)">${AREA_CFG[a].label}</span>
+      <span style="font-size:10px;color:var(--faint);font-style:italic">default</span>
+    </div>`).join('');
+  const custom=state.customAreas&&Object.keys(state.customAreas).length
+    ?Object.entries(state.customAreas).map(([key,cfg])=>{
+      const taskCount=TCOLS.reduce((s,c)=>s+(state.areas[key]?.[c]?.length||0),0);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border)">
+        <div style="width:12px;height:12px;border-radius:50%;flex-shrink:0;background:${cfg.color}"></div>
+        <span style="flex:1;font-size:13px;color:var(--text)">${cfg.label}</span>
+        <span style="font-size:11px;color:var(--muted)">${taskCount} task${taskCount!==1?'s':''}</span>
+        <button onclick="removeCustomArea('${key}')" style="font-size:11px;padding:3px 8px;border-radius:var(--rsm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--red);cursor:pointer;font-family:inherit">Remove</button>
+      </div>`;}).join('')
+    :'<div style="font-size:12px;color:var(--faint);padding:10px 0;border-bottom:0.5px solid var(--border);font-style:italic">No custom areas yet — add one below</div>';
+  list.innerHTML=builtIn+custom;
+}
+function addCustomArea(){
+  const nameEl=document.getElementById('new-area-name');
+  const colorEl=document.getElementById('new-area-color');
+  const name=(nameEl?.value||'').trim();
+  if(!name){showToast('Enter an area name');return;}
+  let key=name.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_+|_+$/g,'').slice(0,20)||('area_'+uid().slice(0,6));
+  let k=key,n=2;
+  while(AREAS.includes(k)||(state.customAreas&&state.customAreas[k]))k=key+'_'+(n++);
+  key=k;
+  if(!state.customAreas)state.customAreas={};
+  state.customAreas[key]={label:name,color:colorEl?.value||'#2563EB'};
+  if(!state.areas[key])state.areas[key]={week:[],waiting:[],done:[]};
+  areaOpen[key]=true;
+  if(nameEl)nameEl.value='';
+  save();render();renderAreaManagerList();
+  showToast(`Area "${name}" added`);
+}
+function removeCustomArea(key){
+  const cfg=state.customAreas&&state.customAreas[key];
+  if(!cfg)return;
+  const taskCount=TCOLS.reduce((s,c)=>s+(state.areas[key]?.[c]?.length||0),0);
+  if(taskCount>0){showToast(`Move or delete the ${taskCount} task${taskCount!==1?'s':''} in "${cfg.label}" first`);return;}
+  if(!confirm(`Remove area "${cfg.label}"?`))return;
+  delete state.customAreas[key];
+  delete state.areas[key];
+  delete areaOpen[key];
+  save();render();renderAreaManagerList();
+  showToast(`Area "${cfg.label}" removed`);
+}
 function openTeamManager(){
   document.getElementById('team-manager-overlay')?.remove();
   const peopleCfg=getPeopleCfg();
@@ -3322,7 +3384,7 @@ function toggleArea(area){areaOpen[area]=!areaOpen[area];save();render();}
 function renderTodayStrip(suffix){
   let html='';
   for(let i=0;i<3;i++){
-    const t=state.today[i];const filled=!!t;const ac=filled?AREA_CFG[t.area]:null;
+    const t=state.today[i];const filled=!!t;const ac=filled?getAreaCfg(t.area):null;
     html+=`<div class="ts-slot${filled?' filled':''}" ondragover="onDragOver(event,this)" ondragleave="onDragLeave(event,this)" ondrop="onDropSlot(event)">
       <div class="ts-slot-num">${i+1}</div>
       ${filled?`<div class="ts-task" id="task-${t.id}-${suffix}" draggable="true" ondragstart="onDragStart(event,{loc:'today',id:'${t.id}'})" ondragend="onDragEnd(event,'${t.id}-${suffix}')">
@@ -3414,7 +3476,7 @@ function renderUrgentView(){
   }
 
   state.today.forEach(t=>{if(!t.isSubtask)seenItems.add(t.id);});
-  AREAS.forEach(area=>TCOLS.filter(c=>c!=='done').forEach(col=>state.areas[area][col].forEach(t=>processTask(t,col))));
+  getAllAreas().forEach(area=>TCOLS.filter(c=>c!=='done').forEach(col=>state.areas[area]?.[col]?.forEach(t=>processTask(t,col))));
 
   const dateSortAsc=(a,b)=>{if(a.due&&b.due)return parseDue(a.due)-parseDue(b.due);if(a.due)return -1;if(b.due)return 1;return 0;};
   buckets.urgent.sort(dateSortAsc);
@@ -3431,7 +3493,7 @@ function renderUrgentView(){
   ];
 
   const cardHtml=item=>{
-    const cfg=AREA_CFG[item.area]||AREA_CFG.survey;
+    const cfg=getAreaCfg(item.area);
     const dateHtml=item.due?`<span class="uc-date ${urgentClass(item.due)}">${fmtDue(item.due)}</span>`:'';
     const waitHtml=item.waiting?`<span class="uc-waiting">⚑ waiting on me</span>`:'';
     const priCfg=item.priority?PRIORITY_CFG[item.priority]:null;
@@ -3557,8 +3619,8 @@ function taskHtml(task,area,col){
 }
 
 function renderBoard(){
-  document.getElementById('areas').innerHTML=AREAS.map(area=>{
-    const cfg=AREA_CFG[area];const open=areaOpen[area];
+  document.getElementById('areas').innerHTML=getAllAreas().map(area=>{
+    const cfg=getAreaCfg(area);const open=areaOpen[area];
     const totalActive=TCOLS.filter(c=>c!=='done').reduce((s,c)=>s+state.areas[area][c].length,0);
     const totalDone=state.areas[area].done.length;
     const urgent=TCOLS.filter(c=>c!=='done').reduce((s,c)=>s+state.areas[area][c].filter(t=>t.waiting||isDueThisWeek(t.due)).length,0);
@@ -3696,7 +3758,7 @@ function renderDump(){
   const priDotColors=PRIORITY_ORDER.map(key=>({key,color:PRIORITY_CFG[key].color,label:PRIORITY_CFG[key].label}));
 
   document.getElementById('dump-items').innerHTML=state.dump.map(d=>{
-    const cfg=AREA_CFG[d.area];
+    const cfg=getAreaCfg(d.area);
     const isReviewing=dumpReviewId===d.id;
     const priCfg=d.priority?PRIORITY_CFG[d.priority]:null;
     const priDot=priCfg?priCfg===PRIORITY_CFG.followup?`<span style="font-size:11px;color:${priCfg.color};margin-left:2px" title="Follow Up">↩</span>`:`<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${priCfg.color};margin-left:2px" title="${priCfg.label}"></span>`:'';
@@ -3718,7 +3780,7 @@ function renderDump(){
         <div class="dump-review-row">
           <span class="dump-review-label">Area</span>
           <select class="dump-review-select" id="dr-area-${d.id}">
-            ${AREAS.map(a=>`<option value="${a}"${d.area===a?' selected':''}>${AREA_CFG[a].label}</option>`).join('')}
+            ${getAllAreas().map(a=>`<option value="${a}"${d.area===a?' selected':''}>${getAreaCfg(a).label}</option>`).join('')}
           </select>
           <input type="date" class="dump-review-date" id="dr-date-${d.id}" value="${d.due||''}" title="Due date">
         </div>
@@ -3765,6 +3827,7 @@ function renderDump(){
 }
 
 function render(){
+  populateAreaSelects();
   renderTodayStrip('u');
   renderTodayStrip('b');
   renderUrgentView();
@@ -3822,7 +3885,7 @@ function importBackup(){
           return;
         }
         state = imported;
-        AREAS.forEach(a=>{
+        getAllAreas().forEach(a=>{
           if(!state.areas[a])state.areas[a]={week:[],waiting:[],done:[]};
           TCOLS.forEach(c=>{if(!state.areas[a][c])state.areas[a][c]=[];});
           TCOLS.forEach(c=>{state.areas[a][c].forEach(t=>{if(!t.subtasks)t.subtasks=[];});});
@@ -3904,15 +3967,15 @@ function getEventsForDate(dateStr){
     if(d>=start&&d<=end)events.push({...ev,source:'custom'});
   });
   // Task due dates
-  AREAS.forEach(area=>{
+  getAllAreas().forEach(area=>{
     TCOLS.filter(c=>c!=='done').forEach(col=>{
-      state.areas[area][col].forEach(t=>{
-        if(t.due===dateStr)events.push({id:t.id,title:t.text,type:'task',area,color:AREA_COLORS[area],source:'task',start:dateStr,end:dateStr});
+      state.areas[area]?.[col]?.forEach(t=>{
+        if(t.due===dateStr)events.push({id:t.id,title:t.text,type:'task',area,color:getAreaColor(area),source:'task',start:dateStr,end:dateStr});
       });
     });
   });
   state.today.forEach(t=>{
-    if(t.due===dateStr)events.push({id:t.id,title:t.text,type:'task',area:t.area,color:AREA_COLORS[t.area],source:'task',start:dateStr,end:dateStr});
+    if(t.due===dateStr)events.push({id:t.id,title:t.text,type:'task',area:t.area,color:getAreaColor(t.area),source:'task',start:dateStr,end:dateStr});
   });
   return events;
 }
@@ -3982,7 +4045,7 @@ function renderCalendar(){
       // Point events for this cell
       const pointEvs=[];
       (state.calEvents||[]).filter(ev=>{const s=dateFromStr(ev.start),e=ev.end?dateFromStr(ev.end):s;return e<=s;}).forEach(ev=>{if(ev.start===ds)pointEvs.push({...ev,source:'custom'});});
-      AREAS.forEach(area=>{TCOLS.filter(c=>c!=='done').forEach(col=>{state.areas[area][col].forEach(task=>{if(task.due===ds)pointEvs.push({id:task.id,title:task.text,color:AREA_COLORS[area],source:'task'});});});});
+      getAllAreas().forEach(area=>{TCOLS.filter(c=>c!=='done').forEach(col=>{state.areas[area]?.[col]?.forEach(task=>{if(task.due===ds)pointEvs.push({id:task.id,title:task.text,color:getAreaColor(area),source:'task'});});});});
       state.today.forEach(task=>{if(!task.isSubtask&&task.due===ds)pointEvs.push({id:task.id,title:task.text,color:AREA_COLORS[task.area],source:'task'});});
       const maxPoint=2;
       const pointHtml=pointEvs.slice(0,maxPoint).map(ev=>{
@@ -4443,7 +4506,7 @@ function saveTaskModal(){
       state.team[delegatePerson].active.push({
         id:uid(), text:newText,
         due:delegateFollowup||updatedTask.due||'',
-        notes:`Delegated from ${AREA_CFG[updatedTask.area]?.label||'board'}${delegateFollowup?' — follow up '+fmtDate(delegateFollowup):''}${subNote}`,
+        notes:`Delegated from ${getAreaCfg(updatedTask.area)?.label||'board'}${delegateFollowup?' — follow up '+fmtDate(delegateFollowup):''}${subNote}`,
         assignedDate:Date.now(),
         delegateName:delegateName||null,
         subtasks:(updatedTask.subtasks||[]).map(s=>({...s})),
@@ -4506,7 +4569,7 @@ function closeTaskModalBg(e){ if(e.target===document.getElementById('task-modal'
 function toggleSubtaskOnBoard(subtaskId, el){
   // Find the task containing this subtask across all areas/cols
   const allTasks = [...state.today];
-  ['survey','acc','auto','fire','family'].forEach(a=>['week','waiting','done'].forEach(c=>state.areas[a][c].forEach(t=>allTasks.push(t))));
+  getAllAreas().forEach(a=>['week','waiting','done'].forEach(c=>state.areas[a]?.[c]?.forEach(t=>allTasks.push(t))));
   allTasks.forEach(task=>{
     if(!task.subtasks) return;
     const sub = task.subtasks.find(s=>s.id===subtaskId);
@@ -4564,7 +4627,8 @@ async function sbSave(s){
   const _KEY='triage_doug_v1';
   function fix(s){
     if(!s)return null;
-    ['survey','acc','auto','fire','family'].forEach(a=>{
+    const fixAreas=['survey','acc','auto','fire','family',...Object.keys(s.customAreas||{})];
+  fixAreas.forEach(a=>{
       if(!s.areas[a])s.areas[a]={week:[],waiting:[],done:[]};
       ['week','waiting','done'].forEach(c=>{
         if(!s.areas[a][c])s.areas[a][c]=[];
@@ -4589,6 +4653,7 @@ async function sbSave(s){
     if(!s.dump)s.dump=[];
     if(!s.calEvents)s.calEvents=[];
     if(!s.removed)s.removed=[];
+    if(!s.customAreas)s.customAreas=null;
     return s;
   }
 
@@ -4753,7 +4818,10 @@ async function finishSetup(){
         const p=JSON.parse(raw);
         if(p&&p.state&&p.state.areas){
           state=fix(p.state);
-          areaOpen=p.areaOpen||{survey:true,acc:true,auto:true,fire:true,family:true};
+          const defaultOpen={survey:true,acc:true,auto:true,fire:true,family:true};
+          if(p.state?.customAreas)Object.keys(p.state.customAreas).forEach(k=>{defaultOpen[k]=true;});
+          areaOpen=p.areaOpen||defaultOpen;
+          if(state.customAreas)Object.keys(state.customAreas).forEach(k=>{if(areaOpen[k]===undefined)areaOpen[k]=true;});
           completedLogOpen=p.completedLogOpen||{doug:false,mike:false,assigned:false};
           loadReminders();
           loadDistractions();
@@ -4782,4 +4850,24 @@ async function finishSetup(){
 </script>
 
 
+
+<!-- AREA MANAGER MODAL -->
+<div class="modal-overlay" id="area-mgr-overlay" style="opacity:0;pointer-events:none" onclick="if(event.target===this)closeAreaManager()">
+  <div class="modal" style="max-width:460px;width:100%">
+    <div class="modal-header">
+      <div class="modal-title">Manage Areas</div>
+      <button class="modal-close" onclick="closeAreaManager()">×</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:12px">The 5 default areas are fixed. Add custom areas for any work that doesn't fit.</div>
+    <div id="area-mgr-list" style="margin-bottom:16px;max-height:320px;overflow-y:auto"></div>
+    <div style="border-top:0.5px solid var(--border);padding-top:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.5px;margin-bottom:10px">ADD NEW AREA</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="new-area-name" class="modal-input" placeholder="Area name..." style="flex:1;padding:8px 10px" onkeydown="if(event.key==='Enter')addCustomArea()">
+        <input type="color" id="new-area-color" value="#2563EB" style="width:38px;height:34px;border-radius:var(--rsm);border:0.5px solid var(--border-md);cursor:pointer;padding:2px;background:var(--surface)">
+        <button class="add-assign-btn" onclick="addCustomArea()" style="white-space:nowrap">Add area</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body></html>
