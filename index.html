@@ -3049,12 +3049,12 @@ function populateAreaSelects(){
 function openAreaManager(){
   renderAreaManagerList();
   const o=document.getElementById('area-mgr-overlay');
-  if(o){o.style.opacity='1';o.style.pointerEvents='auto';}
+  if(o){o.classList.add('open');}
   document.getElementById('new-area-name')?.focus();
 }
 function closeAreaManager(){
   const o=document.getElementById('area-mgr-overlay');
-  if(o){o.style.opacity='0';o.style.pointerEvents='none';}
+  if(o){o.classList.remove('open');}
 }
 function renderAreaManagerList(){
   const list=document.getElementById('area-mgr-list');
@@ -4853,7 +4853,7 @@ async function finishSetup(){
 
 <!-- AREA MANAGER MODAL -->
 <div class="modal-overlay" id="area-mgr-overlay" style="opacity:0;pointer-events:none" onclick="if(event.target===this)closeAreaManager()">
-  <div class="modal" style="max-width:460px;width:100%">
+  <div class="modal-panel" style="max-width:460px;width:100%;padding:18px">
     <div class="modal-header">
       <div class="modal-title">Manage Areas</div>
       <button class="modal-close" onclick="closeAreaManager()">×</button>
