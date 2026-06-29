@@ -1284,26 +1284,26 @@ main{padding:16px 24px;max-width:100%;margin:0 auto}
 
 /* ── PASSWORD PROTECTION ── */
 (function(){
-  const HASH = 'bf14b94c292823aabc4c14a2e58ad95ba67037b8c9abba283cfec83c86f1dac0';
-  const SESSION_KEY = 'triage_auth';
-  
+  const HASH = 'bf14b94c292823aabc4c14a2e58ad95ba67037b8c9abba283cfec83c86f1dac0'; // fallback only
+  const SESSION_KEY = 'triage_doug_session';
+
   async function sha256(str){
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
   }
-  
+
   function showApp(){
     const pw = document.getElementById('pw-screen');
     if(pw) pw.style.display='none';
   }
-  
+
   async function checkPw(){
     const input = document.getElementById('pw-input');
     const err = document.getElementById('pw-error');
     const val = input.value;
     if(!val) return;
     const hash = await sha256(val);
-    const validHash=DYNAMIC_HASH||HASH;
+    const validHash = localStorage.getItem('triage_doug_hash') || HASH;
     if(hash === validHash){
       sessionStorage.setItem(SESSION_KEY, '1');
       showApp();
@@ -1314,13 +1314,14 @@ main{padding:16px 24px;max-width:100%;margin:0 auto}
       setTimeout(()=>err.style.display='none', 3000);
     }
   }
-  
-  // Check if already authenticated this session
-  if(sessionStorage.getItem(SESSION_KEY)==='1'){
+
+  // If setup not complete, bypass gate — wizard will set the password
+  if(!localStorage.getItem('triage_doug_setup_done')){
+    showApp();
+  } else if(sessionStorage.getItem(SESSION_KEY)==='1'){
     showApp();
   }
-  
-  // Make checkPw global
+
   window.checkPw = checkPw;
 })();
 
@@ -2655,6 +2656,12 @@ function sortedTasks(tasks){
 function clearSortOrder(task){
   const t={...task};delete t.sortOrder;return t;
 }
+// Reset an entire column back to date-based auto-sort
+function resetColSort(area,col){
+  state.areas[area][col].forEach(t=>delete t.sortOrder);
+  save();render();
+  showToast('Sorted by date');
+}
 
 function clearReentryNote(taskId){
   const allTasks=[...state.today];
@@ -3353,20 +3360,18 @@ function onDropCol(e,toArea,toCol){
         const dropId=dropTarget.id.replace('task-','');
         const found=sorted.findIndex(t=>t.id===dropId);
         if(found>-1){
-          // Use drop-above vs drop-below to determine insert before or after
           const insertBefore=dropTarget.classList.contains('drop-above');
           toIdx=insertBefore?found:found;
-          // If inserting after, position is found; if before, same index (splice behavior handles it)
         }
       }
-      // Clean up indicators
       document.querySelectorAll('.task.drop-above,.task.drop-below').forEach(t=>t.classList.remove('drop-above','drop-below'));
       if(fromIdx===toIdx){save();render();return;}
       const [moved]=sorted.splice(fromIdx,1);
       sorted.splice(toIdx,0,moved);
+      // Only stamp sortOrder on tasks that already have one, plus the moved task
       sorted.forEach((t,i)=>{
         const real=col.find(x=>x.id===t.id);
-        if(real)real.sortOrder=i;
+        if(real&&(real.sortOrder!=null||real.id===src.id))real.sortOrder=i;
       });
       save();render();return;
     }
@@ -3637,8 +3642,10 @@ function renderBoard(){
         <button class="add-task-waiting" id="aw-${area}-${col}" onclick="toggleAddWaiting('${area}','${col}')" title="Waiting on me">⚑</button>
         <button class="add-task-btn" onclick="addTask('${area}','${col}')">+</button>
       </div>`:'';
+      const hasManual=col!=='done'&&state.areas[area][col].some(t=>t.sortOrder!=null);
+      const sortBtn=hasManual?`<button onclick="resetColSort('${area}','${col}')" title="Reset to date order" style="font-size:9px;padding:1px 5px;border-radius:3px;border:0.5px solid var(--border-md);background:var(--surface2);color:var(--muted);cursor:pointer;font-family:inherit;margin-left:auto">↕ date</button>`:'';
       return `<div class="tcol${col==='done'?' tcol-done':''}" ondragover="onDragOver(event,this)" ondragleave="onDragLeave(event,this)" ondrop="onDropCol(event,'${area}','${col}')">
-        <div class="tcol-header"><div class="tcol-dot" style="background:${ccfg.dot}"></div><span class="tcol-title">${ccfg.label}</span><span class="tcol-count">${tasks.length}</span></div>
+        <div class="tcol-header"><div class="tcol-dot" style="background:${ccfg.dot}"></div><span class="tcol-title">${ccfg.label}</span><span class="tcol-count">${tasks.length}</span>${sortBtn}</div>
         <div>${tasksHtml}</div>${addRow}
         <div class="drop-hint">drop here</div>
       </div>`;
