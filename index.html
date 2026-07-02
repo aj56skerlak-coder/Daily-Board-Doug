@@ -1533,6 +1533,7 @@ function restoreFocusSession(){
     const dot=document.getElementById('pulse-timer-dot');
     if(dot) dot.classList.add('running');
     document.getElementById('time-blocks-wrap').style.display='block';
+    clearInterval(pulseTimerInterval);
     pulseTimerInterval=setInterval(tickPulse,1000);
     updatePulseTimerDisplay();
     showToast('Focus session resumed');
@@ -1586,6 +1587,7 @@ function startFocusSession(){
   renderTimeBlocks();
 
   // Tick every second — fires at :00 and :30 clock marks
+  clearInterval(pulseTimerInterval);
   pulseTimerInterval=setInterval(tickPulse,1000);
   updatePulseTimerDisplay();
   saveFocusSession();
@@ -1612,19 +1614,26 @@ function stopFocusSession(){
   saveFocusSession();
 }
 
+let lastPulseMark=''; // tracks which :00/:30 mark we last fired on — prevents double-fire
+
 function tickPulse(){
   if(!pulseSessionActive) return;
   const now=new Date();
+  const h=now.getHours();
   const mins=now.getMinutes();
   const secs=now.getSeconds();
-  // Fire at exactly :00 or :30 on the clock — but skip if in an event block
-  if((mins===0||mins===30)&&secs===0){
-    if(isPulseBlockedNow()){
-      showToast('Check-in skipped — blocked time');
-    } else {
-      firePulse();
+  // Fire within a 6-second window of each :00/:30 mark — handles timer drift
+  if((mins===0||mins===30)&&secs<6){
+    const markKey=`${h}:${mins===0?'00':'30'}`;
+    if(markKey!==lastPulseMark){
+      lastPulseMark=markKey;
+      if(isPulseBlockedNow()){
+        showToast('Check-in skipped — blocked time');
+      } else {
+        firePulse();
+      }
+      return;
     }
-    return;
   }
   updatePulseTimerDisplay();
 }
@@ -1677,22 +1686,31 @@ function firePulse(){
     document.querySelector('.pulse-body').prepend(taskSection);
   }
 
-  // Build task options for selector
+  // Build task options — all areas, all active tasks
   const allTasks=[];
   getAllAreas().forEach(area=>TCOLS.filter(c=>c!=='done').forEach(col=>{
-    state.areas[area][col].forEach(t=>{if(!t.isSubtask)allTasks.push({id:t.id,text:t.text,area});});
+    state.areas[area]?.[col]?.forEach(t=>{if(!t.isSubtask)allTasks.push({id:t.id,text:t.text,area});});
   }));
   state.today.filter(t=>!t.isSubtask).forEach(t=>{if(!allTasks.find(x=>x.id===t.id))allTasks.push({id:t.id,text:t.text,area:t.area});});
 
-  const opts=allTasks.slice(0,20).map(t=>`<option value="${t.id}"${activeTask&&t.id===activeTask.id?' selected':''}>${getAreaCfg(t.area)?.label||''} — ${t.text.slice(0,50)}</option>`).join('');
-
   taskSection.innerHTML=`
     <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">Logging time to</div>
-    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px">${taskName}</div>
-    <select id="pulse-task-override" style="width:100%;font-size:11px;padding:5px 7px;border:0.5px solid var(--border-md);border-radius:4px;background:var(--surface);color:var(--text);outline:none;font-family:inherit">
-      <option value="">— change task —</option>
-      ${opts}
-    </select>`;
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">${taskName}</div>
+    <input id="pulse-task-search" placeholder="Search or change task..." autocomplete="off"
+      style="width:100%;box-sizing:border-box;font-size:12px;padding:6px 8px;border:0.5px solid var(--border-md);border-radius:4px;background:var(--surface);color:var(--text);outline:none;font-family:inherit;margin-bottom:4px"
+      oninput="filterPulseTasks()">
+    <div id="pulse-task-results" style="max-height:160px;overflow-y:auto;border:0.5px solid var(--border-md);border-radius:4px;background:var(--surface)">
+      <div class="pulse-task-opt" data-id="__none__" onclick="selectPulseTask('__none__','No task — skip time logging','')"
+        style="padding:7px 10px;font-size:12px;cursor:pointer;color:var(--muted);border-bottom:0.5px solid var(--border);font-style:italic">
+        ✕ No task — skip time logging
+      </div>
+      ${allTasks.map(t=>`<div class="pulse-task-opt" data-id="${t.id}" data-text="${(t.text||'').replace(/"/g,'&quot;')}" onclick="selectPulseTask('${t.id}',${JSON.stringify(t.text)},${JSON.stringify(getAreaCfg(t.area)?.label||'')})"
+        style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:0.5px solid var(--border)"${activeTask&&t.id===activeTask.id?' class="pulse-task-opt pulse-task-selected"':''}>
+        <span style="font-size:10px;color:${getAreaCfg(t.area)?.color||'var(--muted)'};font-weight:600;margin-right:6px">${getAreaCfg(t.area)?.label||''}</span>${t.text.slice(0,70)}
+      </div>`).join('')}
+    </div>
+    <div id="pulse-task-chosen" style="display:none;margin-top:6px;font-size:11px;color:var(--muted);padding:4px 8px;background:var(--surface2);border-radius:4px"></div>
+    <input type="hidden" id="pulse-task-override" value="">`;
 
   // Clear previous answers
   pulseAnswers={ontask:null,productive:null};
@@ -1721,6 +1739,29 @@ function firePulse(){
   resetDistractionBlock();
 }
 
+function filterPulseTasks(){
+  const q=(document.getElementById('pulse-task-search')?.value||'').toLowerCase();
+  document.querySelectorAll('#pulse-task-results .pulse-task-opt').forEach(el=>{
+    if(el.dataset.id==='__none__'){el.style.display='';return;}
+    const txt=(el.dataset.text||'').toLowerCase();
+    el.style.display=(!q||txt.includes(q))?'':'none';
+  });
+}
+function selectPulseTask(id,text,areaLabel){
+  document.getElementById('pulse-task-override').value=id;
+  const chosen=document.getElementById('pulse-task-chosen');
+  if(chosen){
+    chosen.style.display='block';
+    chosen.textContent=id==='__none__'?'✕ No task — time not logged':`→ ${areaLabel?areaLabel+' — ':''}${text.slice(0,60)}`;
+  }
+  document.querySelectorAll('#pulse-task-results .pulse-task-opt').forEach(el=>{
+    el.style.background=el.dataset.id===id?'var(--surface2)':'';
+    el.style.fontWeight=el.dataset.id===id?'600':'';
+  });
+  document.getElementById('pulse-task-search').value='';
+  filterPulseTasks();
+}
+
 function setPulseAnswer(question, answer){
   pulseAnswers[question]=answer;
   const yesId=`pulse-${question}-yes`;
@@ -1736,7 +1777,9 @@ function confirmPulse(){
   // Check if user changed the task in the modal
   const overrideId=document.getElementById('pulse-task-override')?.value;
   let logTask=activeTask;
-  if(overrideId){
+  if(overrideId==='__none__'){
+    logTask=null; // user explicitly chose no task — skip time logging
+  } else if(overrideId){
     let found=state.today.find(t=>t.id===overrideId);
     if(!found) getAllAreas().forEach(a=>TCOLS.forEach(c=>{if(!found)found=state.areas[a]?.[c]?.find(t=>t.id===overrideId);}));
     if(found) logTask=found;
@@ -1803,8 +1846,9 @@ function confirmPulse(){
 // Real-time time indicator — updates every 30 seconds
 let timeIndicatorInterval=null;
 function startTimeIndicator(){
-  updateTimeIndicator();
   if(timeIndicatorInterval) clearInterval(timeIndicatorInterval);
+  document.getElementById('time-now-indicator')?.remove();
+  updateTimeIndicator();
   timeIndicatorInterval=setInterval(updateTimeIndicator, 30000);
 }
 function updateTimeIndicator(){
@@ -2042,7 +2086,8 @@ function renderTimeBlocks(){
 
   grid.innerHTML=rows.join('');
 
-  // Time indicator updated by updateTimeIndicator() interval
+  // Recalculate indicator position immediately after grid rebuild
+  updateTimeIndicator();
 
   if(slotPickerOpen){
     setTimeout(()=>document.getElementById('slot-search-'+slotPickerOpen)?.focus(),50);
